@@ -1,0 +1,244 @@
+{\rtf1\ansi\deff0\nouicompat{\fonttbl{\f0\fnil\fcharset0 Calibri;}}
+{\*\generator Riched20 10.0.19041}\viewkind4\uc1 
+\pard\sa200\sl276\slmult1\f0\fs22\lang9 import \\'package:flutter/material.dart\\';\par
+import \\'package:firebase_core/firebase_core.dart\\';\par
+import \\'package:firebase_auth/firebase_auth.dart\\';\par
+import \\'package:google_sign_in/google_sign_in.dart\\';\par
+import \\'package:cloud_firestore/cloud_firestore.dart\\';\par
+import \\'package:flutter/services.dart\\';\par
+\par
+void main() async \{\par
+  WidgetsFlutterBinding.ensureInitialized();\par
+  await Firebase.initializeApp();\par
+  runApp(MyApp());\par
+\}\par
+\par
+class MyApp extends StatelessWidget \{\par
+  @override\par
+  Widget build(BuildContext context) \{\par
+    return MaterialApp(\par
+      title: \\'My Text Vault\\',\par
+      debugShowCheckedModeBanner: false,\par
+      theme: ThemeData(\par
+        brightness: Brightness.light,\par
+        primaryColor: Color(0xFF1A56DB),\par
+        scaffoldBackgroundColor: Color(0xFFF8FAFC),\par
+        appBarTheme: AppBarTheme(\par
+          backgroundColor: Color(0xFF1A56DB),\par
+          foregroundColor: Colors.white,\par
+          elevation: 0,\par
+        ),\par
+        floatingActionButtonTheme: FloatingActionButtonThemeData(\par
+          backgroundColor: Color(0xFF1A56DB),\par
+        ),\par
+      ),\par
+      home: AuthCheck(),\par
+    );\par
+  \}\par
+\}\par
+\par
+class AuthCheck extends StatelessWidget \{\par
+  @override\par
+  Widget build(BuildContext context) \{\par
+    return StreamBuilder<User?>(\par
+      stream: FirebaseAuth.instance.authStateChanges(),\par
+      builder: (context, snapshot) \{\par
+        if (snapshot.connectionState == ConnectionState.waiting) \{\par
+          return Scaffold(body: Center(child: CircularProgressIndicator()));\par
+        \}\par
+        if (snapshot.hasData) return HomeScreen();\par
+        return LoginScreen();\par
+      \},\par
+    );\par
+  \}\par
+\}\par
+\par
+class LoginScreen extends StatelessWidget \{\par
+  Future<void> signInWithGoogle() async \{\par
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();\par
+    if (googleUser == null) return;\par
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;\par
+    final credential = GoogleAuthProvider.credential(\par
+      accessToken: googleAuth.accessToken,\par
+      idToken: googleAuth.idToken,\par
+    );\par
+    await FirebaseAuth.instance.signInWithCredential(credential);\par
+  \}\par
+\par
+  @override\par
+  Widget build(BuildContext context) \{\par
+    return Scaffold(\par
+      body: Center(\par
+        child: Padding(\par
+          padding: EdgeInsets.all(30),\par
+          child: Column(\par
+            mainAxisAlignment: MainAxisAlignment.center,\par
+            children: [\par
+              Icon(Icons.lock_rounded, size: 90, color: Color(0xFF1A56DB)),\par
+              SizedBox(height: 15),\par
+              Text("My Text Vault", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF1A56DB))),\par
+              Text("Aapka Data 100% Safe", style: TextStyle(color: Colors.grey)),\par
+              SizedBox(height: 50),\par
+              ElevatedButton.icon(\par
+                onPressed: signInWithGoogle,\par
+                icon: Icon(Icons.login, color: Colors.white),\par
+                label: Text("Gmail se Login Karein", style: TextStyle(color: Colors.white, fontSize: 16)),\par
+                style: ElevatedButton.styleFrom(\par
+                  backgroundColor: Color(0xFF1A56DB),\par
+                  minimumSize: Size(double.infinity, 55),\par
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),\par
+                ),\par
+              ),\par
+            ],\par
+          ),\par
+        ),\par
+      ),\par
+    );\par
+  \}\par
+\}\par
+\par
+class HomeScreen extends StatefulWidget \{\par
+  @override\par
+  _HomeScreenState createState() => _HomeScreenState();\par
+\}\par
+\par
+class _HomeScreenState extends State<HomeScreen> \{\par
+  String search = "";\par
+  final user = FirebaseAuth.instance.currentUser!;\par
+\par
+  @override\par
+  Widget build(BuildContext context) \{\par
+    return Scaffold(\par
+      appBar: AppBar(\par
+        title: Text("My Text Vault"),\par
+        actions: [\par
+          IconButton(icon: Icon(Icons.logout), onPressed: () async \{\par
+            await GoogleSignIn().signOut();\par
+            await FirebaseAuth.instance.signOut();\par
+          \})\par
+        ],\par
+      ),\par
+      body: Column(\par
+        children: [\par
+          Padding(\par
+            padding: EdgeInsets.all(12),\par
+            child: TextField(\par
+              onChanged: (v) => setState(() => search = v.toLowerCase()),\par
+              decoration: InputDecoration(\par
+                hintText: "Search Email, Password...",\par
+                prefixIcon: Icon(Icons.search),\par
+                filled: true,\par
+                fillColor: Colors.white,\par
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),\par
+              ),\par
+            ),\par
+          ),\par
+          Expanded(\par
+            child: StreamBuilder<QuerySnapshot>(\par
+              stream: FirebaseFirestore.instance.collection(\\'users\\').doc(user.uid).collection(\\'vault\\').orderBy(\\'createdAt\\', descending: true).snapshots(),\par
+              builder: (context, snapshot) \{\par
+                if (!snapshot.hasData) return Center(child: CircularProgressIndicator());\par
+                var docs = snapshot.data!.docs.where((d) \{\par
+                  var data = d.data() as Map<String, dynamic>;\par
+                  return data[\\'title\\'].toString().toLowerCase().contains(search) || data[\\'username\\'].toString().toLowerCase().contains(search);\par
+                \}).toList();\par
+\par
+                if (docs.isEmpty) return Center(child: Text("Koi data nahi hai.\\n+ se naya add karein", textAlign: TextAlign.center));\par
+\par
+                return ListView.builder(\par
+                  itemCount: docs.length,\par
+                  itemBuilder: (context, i) \{\par
+                    var data = docs[i].data() as Map<String, dynamic>;\par
+                    return Card(\par
+                      margin: EdgeInsets.symmetric(horizontal: 12, vertical: 6),\par
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),\par
+                      child: ListTile(\par
+                        leading: CircleAvatar(backgroundColor: Color(0xFF1A56DB), child: Icon(Icons.key, color: Colors.white)),\par
+                        title: Text(data[\\'title\\'], style: TextStyle(fontWeight: FontWeight.bold)),\par
+                        subtitle: Text(data[\\'username\\']),\par
+                        trailing: Row(\par
+                          mainAxisSize: MainAxisSize.min,\par
+                          children: [\par
+                            IconButton(icon: Icon(Icons.copy, color: Colors.grey), onPressed: () \{\par
+                              Clipboard.setData(ClipboardData(text: data[\\'password\\']));\par
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Password Copy ho gaya")));\par
+                            \}),\par
+                            IconButton(icon: Icon(Icons.delete, color: Colors.red), onPressed: () => docs[i].reference.delete()),\par
+                          ],\par
+                        ),\par
+                        onTap: () => showDialog(context: context, builder: (_) => AlertDialog(\par
+                          title: Text(data[\\'title\\']),\par
+                          content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [\par
+                            Text("Username: $\{data[\\'username\\']\}"),\par
+                            SizedBox(height: 8),\par
+                            Text("Password: $\{data[\\'password\\']\}", style: TextStyle(fontWeight: FontWeight.bold)),\par
+                            SizedBox(height: 8),\par
+                            Text("Note: $\{data[\\'note\\'] ?? \\'\\'\}"),\par
+                          ]),\par
+                        )),\par
+                      ),\par
+                    );\par
+                  \},\par
+                );\par
+              \},\par
+            ),\par
+          ),\par
+        ],\par
+      ),\par
+      floatingActionButton: FloatingActionButton(\par
+        child: Icon(Icons.add),\par
+        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AddDataScreen())),\par
+      ),\par
+    );\par
+  \}\par
+\}\par
+\par
+class AddDataScreen extends StatefulWidget \{\par
+  @override\par
+  _AddDataScreenState createState() => _AddDataScreenState();\par
+\}\par
+\par
+class _AddDataScreenState extends State<AddDataScreen> \{\par
+  final titleC = TextEditingController();\par
+  final userC = TextEditingController();\par
+  final passC = TextEditingController();\par
+  final noteC = TextEditingController();\par
+\par
+  void save() async \{\par
+    if (titleC.text.isEmpty || passC.text.isEmpty) return;\par
+    final user = FirebaseAuth.instance.currentUser!;\par
+    await FirebaseFirestore.instance.collection(\\'users\\').doc(user.uid).collection(\\'vault\\').add(\{\par
+      \\'title\\': titleC.text,\par
+      \\'username\\': userC.text,\par
+      \\'password\\': passC.text,\par
+      \\'note\\': noteC.text,\par
+      \\'createdAt\\': FieldValue.serverTimestamp(),\par
+    \});\par
+    Navigator.pop(context);\par
+  \}\par
+\par
+  @override\par
+  Widget build(BuildContext context) \{\par
+    return Scaffold(\par
+      appBar: AppBar(title: Text("Naya Data Add Karein")),\par
+      body: Padding(\par
+        padding: EdgeInsets.all(16),\par
+        child: Column(\par
+          children: [\par
+            TextField(controller: titleC, decoration: InputDecoration(labelText: "Title (jaise Gmail, Facebook)", border: OutlineInputBorder())),\par
+            SizedBox(height: 12),\par
+            TextField(controller: userC, decoration: InputDecoration(labelText: "Email / Username", border: OutlineInputBorder())),\par
+            SizedBox(height: 12),\par
+            TextField(controller: passC, decoration: InputDecoration(labelText: "Password", border: OutlineInputBorder())),\par
+            SizedBox(height: 12),\par
+            TextField(controller: noteC, decoration: InputDecoration(labelText: "Note (Optional)", border: OutlineInputBorder())),\par
+            SizedBox(height: 20),\par
+            ElevatedButton(onPressed: save, child: Text("Save Karein", style: TextStyle(color: Colors.white)), style: ElevatedButton.styleFrom(backgroundColor: Color(0xFF1A56DB), minimumSize: Size(double.infinity, 50))),\par
+          ],\par
+        ),\par
+      ),\par
+    );\par
+  \}\par
+\}\par
+}
+ 
